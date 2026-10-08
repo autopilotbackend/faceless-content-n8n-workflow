@@ -22,6 +22,10 @@ No logins or keys are stored in these files. You add your own.
 
 This repo has 3 of the 15 workflows we run. The free research workflow comes with a short email series at **[get.autopilotbackend.com](https://get.autopilotbackend.com)**. The full pack covers research, scripts, voice, video, publishing, and reports.
 
+## No server yet?
+
+Deploy n8n with a Postgres database on Railway in one click, then import the files above: **[Deploy on Railway](https://railway.com/deploy/autopilot-backend-n8n)**. The Dockerfile, `railway.json` and `.env.example` in this repo are what the template uses.
+
 ## License
 
 MIT. Use it, change it, share it.
