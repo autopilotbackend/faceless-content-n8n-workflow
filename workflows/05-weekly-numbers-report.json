@@ -1,0 +1,133 @@
+{
+  "name": "05 Weekly numbers report",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "e1000000-0000-4000-8000-000000000001",
+      "name": "Every Monday 8am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "PASTE_SHEET_ID_OR_PICK_FROM_LIST"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Published"
+        },
+        "options": {}
+      },
+      "id": "e1000000-0000-4000-8000-000000000002",
+      "name": "Read Published",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst weekAgo = Date.now() - 7*24*60*60*1000;\nconst thisWeek = items.filter(i => new Date(i.json['Published date']).getTime() > weekAgo);\nconst summary = `Published this week: ${thisWeek.length} pieces.\\n` + thisWeek.map(i => `- ${i.json.Title}: ${i.json['YouTube URL'] || 'no link yet'}`).join('\\n');\nreturn [{ json: { subject: 'Autopilot Backend: weekly numbers', text: summary, to: 'you@example.com' } }];"
+      },
+      "id": "e1000000-0000-4000-8000-000000000003",
+      "name": "Build summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "you@example.com",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "text": "={{ $json.text }}",
+        "options": {}
+      },
+      "id": "e1000000-0000-4000-8000-000000000004",
+      "name": "Send summary email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "Built by Autopilot Backend.\nGet the free starter workflow and the full 15-workflow pack at get.autopilotbackend.com",
+        "height": 120,
+        "width": 340
+      },
+      "name": "About this workflow",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -220
+      ]
+    }
+  ],
+  "connections": {
+    "Every Monday 8am": {
+      "main": [
+        [
+          {
+            "node": "Read Published",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Published": {
+      "main": [
+        [
+          {
+            "node": "Build summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build summary": {
+      "main": [
+        [
+          {
+            "node": "Send summary email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "notes": "Sends you a plain-text weekly summary of what published. Set the recipient in the Send Email node. Left inactive until the Published tab has real data."
+}
