@@ -1,0 +1,88 @@
+{
+  "name": "00 Error alerts by email",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "9eb32ffa-e48d-4a9f-8432-5c395258db5a",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const e = $('Error Trigger').first().json;\nconst wfName = e.workflow?.name || 'unknown workflow';\nconst nodeName = e.execution?.lastNodeExecuted || 'unknown node';\nconst msg = (e.execution?.error?.message || 'no message').slice(0, 800);\nconst url = e.execution?.url || '';\nlet hint = 'Check the execution in n8n for details.';\nif (/401|unauthor|invalid token|expired/i.test(msg)) hint = '401: an account needs to be reconnected. Open n8n > Credentials and re-authenticate.';\nelse if (/429|rate limit|too many/i.test(msg)) hint = '429: rate limit. Open the failed node, turn on Retry On Fail, save.';\nelse if (/timeout|ETIMEDOUT|ECONNRESET/i.test(msg)) hint = 'Timeout: open the execution and click Retry.';\nconst subject = `n8n error: ${wfName}`;\nconst text = `${wfName} failed at ${nodeName}\\n\\n${msg}\\n\\nWhat to do: ${hint}\\n${url}`;\nreturn [{ json: { subject, text, to: 'you@example.com' } }];"
+      },
+      "id": "db356fae-ce63-4b46-9964-e0cf51d9f32f",
+      "name": "Build message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "you@example.com",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "text": "={{ $json.text }}",
+        "options": {}
+      },
+      "id": "310d07e6-424f-41d8-bd46-b32b93057a39",
+      "name": "Send email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "Built by Autopilot Backend.\nGet the free starter workflow and the full 15-workflow pack at get.autopilotbackend.com",
+        "height": 120,
+        "width": 340
+      },
+      "name": "About this workflow",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -220
+      ]
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build message": {
+      "main": [
+        [
+          {
+            "node": "Send email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
