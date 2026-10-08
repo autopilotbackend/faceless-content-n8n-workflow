@@ -1,0 +1,321 @@
+{
+  "name": "01 Research: daily topics",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "3bf1b7ae-6d87-4285-acc8-a8b506aaa536",
+      "name": "Every day 6am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.reddit.com/r/n8n/hot.json?limit=40",
+        "options": {
+          "headers": {
+            "User-Agent": "autopilot-backend-research/1.0"
+          }
+        }
+      },
+      "id": "5311c127-a1db-4789-8d97-92fb1d38176a",
+      "name": "Reddit r/n8n",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.reddit.com/r/automation/hot.json?limit=40",
+        "options": {
+          "headers": {
+            "User-Agent": "autopilot-backend-research/1.0"
+          }
+        }
+      },
+      "id": "589cd4df-e2ea-455c-8621-33bc6da2e864",
+      "name": "Reddit r/automation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "part",
+              "value": "snippet"
+            },
+            {
+              "name": "q",
+              "value": "n8n automation tutorial"
+            },
+            {
+              "name": "type",
+              "value": "video"
+            },
+            {
+              "name": "order",
+              "value": "viewCount"
+            },
+            {
+              "name": "publishedAfter",
+              "value": "={{ $now.minus({days: 14}).toISO() }}"
+            },
+            {
+              "name": "maxResults",
+              "value": "25"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "594dfa3c-b10b-45cc-a74b-88d8d1757c3a",
+      "name": "YouTube search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = [];\nfor (const item of $('Reddit r/n8n').all().concat($('Reddit r/automation').all())) {\n  for (const c of (item.json.data?.children || [])) {\n    const d = c.data; if (!d || d.stickied) continue;\n    out.push({ json: { source: 'reddit/' + d.subreddit, title: d.title, signal: d.ups, comments: d.num_comments, url: 'https://reddit.com' + d.permalink } });\n  }\n}\nfor (const item of $('YouTube search').all()) {\n  for (const v of (item.json.items || [])) {\n    out.push({ json: { source: 'youtube', title: v.snippet.title, signal: 0, comments: 0, url: 'https://youtube.com/watch?v=' + v.id.videoId, channel: v.snippet.channelTitle } });\n  }\n}\nreturn out;"
+      },
+      "id": "d6ee6d14-16fd-4db1-82cf-3043484b87a3",
+      "name": "Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "id": "c7d9163f-632e-409e-9121-3e9856143636",
+      "name": "Aggregate",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        700,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: 'claude-sonnet-4-5',\n  max_tokens: 4000,\n  system: 'You research video topics for Autopilot Backend, a faceless YouTube channel about n8n automation, faceless content systems, and self-hosted tools for freelancers and small agencies. Plain language, no hype. Output JSON only.',\n  messages: [{ role: 'user', content: 'Here are today\\'s trending posts and videos:\\n' + JSON.stringify($json.data).slice(0, 60000) + '\\n\\nPick the 10 best long-form video topics for our channel. For each return: topic (a working video title, specific, outcome or cost focused), keyword (2 to 4 words someone would search), est_searches (your best estimate per month as a number), score (1 to 10 for demand x fit x low competition), tier (one of: $97, $497, Community, DFY, meaning which product the video should point to), why (one sentence). Return ONLY a JSON array of 10 objects, no markdown.' }]\n}) }}",
+        "options": {}
+      },
+      "id": "e2153875-4631-4cc2-99f6-cb6a07c7444e",
+      "name": "Score with Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        920,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let text = $json.content?.[0]?.text || '[]';\ntext = text.replace(/```json|```/g, '').trim();\nconst arr = JSON.parse(text);\nconst today = new Date().toISOString().slice(0,10);\nreturn arr.map((t, i) => ({ json: { ID: today.replace(/-/g,'') + '-' + String(i+1).padStart(2,'0'), 'Date found': today, Topic: t.topic, Keyword: t.keyword, 'Est. searches': t.est_searches, Score: t.score, Source: t.why, Tier: t.tier, Status: 'New', 'Approved by': '' } }));"
+      },
+      "id": "af57a077-1917-4fa4-94ed-fe72ed79f3aa",
+      "name": "Parse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "PASTE_SHEET_ID_OR_PICK_FROM_LIST"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Topics"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "356a9ecb-8264-41f6-8f16-58eccaf7fe00",
+      "name": "Append to Topics",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1360,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "content": "Built by Autopilot Backend.\nGet the free starter workflow and the full 15-workflow pack at get.autopilotbackend.com",
+        "height": 120,
+        "width": 340
+      },
+      "name": "About this workflow",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -160
+      ]
+    }
+  ],
+  "connections": {
+    "Every day 6am": {
+      "main": [
+        [
+          {
+            "node": "Reddit r/n8n",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Reddit r/automation",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "YouTube search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reddit r/n8n": {
+      "main": [
+        [
+          {
+            "node": "Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reddit r/automation": {
+      "main": [
+        [
+          {
+            "node": "Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YouTube search": {
+      "main": [
+        [
+          {
+            "node": "Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Score with Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score with Claude": {
+      "main": [
+        [
+          {
+            "node": "Parse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse": {
+      "main": [
+        [
+          {
+            "node": "Append to Topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
